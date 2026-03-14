@@ -2295,7 +2295,8 @@ async function d3AISuggest(silent){
     const prompt=`Jesteś AI coachem dla Ignacego (20 lat, Kopenhaga, Polska). Metoda: Ivy Lee + MIT + Pareto.
 
 DANE:
-- Dzień: ${dzis} | Trening: ${tr} | Streak: ${streak} dni | XP: ${totalXP}
+- Dzień: ${dzis} | Streak: ${streak} dni | XP: ${totalXP}
+- TRENING DZIŚ: ${trFull||tr}
 - ${habTxt}
 
 DOSTĘPNE QUESTY (id|tytuł|projekt|xp):
@@ -3047,10 +3048,23 @@ function _aiCtx(){
   const mhDone=doneQ.filter(q=>q.proj==='minhule').length;
   const dow=new Date().getDay();
   const dn=['niedziela','poniedziałek','wtorek','środa','czwartek','piątek','sobota'];
-  const sk=DAY_TO_SIL[dow];const tr=SIL_PLAN[sk]?SIL_PLAN[sk].label:'odpoczynek';
+  const sk=DAY_TO_SIL[dow];
+  const silDay=SIL_PLAN[sk];
+  const tr=silDay?silDay.label:'odpoczynek';
+  const trFull=silDay?`${silDay.type} — ${silDay.sub} | Główne: ${(silDay.main||[]).map(e=>e.name+' '+e.sets).join(', ')}`:'ODPOCZYNEK — brak treningu siłowego';
+  // Buduj szczegółowy opis treningu dnia
+  let trDetail='ODPOCZYNEK — brak treningu siłowego dziś';
+  if(silDay){
+    const mainEx=(silDay.main||[]).map(e=>e.name+' '+e.sets).join(', ');
+    const accEx=(silDay.acc||[]).slice(0,3).map(e=>e.name+' '+e.sets).join(', ');
+    const warmEx=(silDay.warmup||[]).slice(0,3).map(e=>e.name+' '+e.sets).join(', ');
+    trDetail=`${silDay.type} — ${silDay.sub}
+  Rozgrzewka: ${warmEx}
+  Główne: ${mainEx}
+  Akcesoria: ${accEx}`;
+  }
   const streak=S.streak||0;const xp=S.xp||0;
   const lvl=getLvl(xp);
-  // Zaległe nawyki (streak broken?)
   const yesterdayKey=new Date(Date.now()-86400000).toDateString();
   const habYesterday=(S.habits&&S.habits[yesterdayKey])||[];
   const streakWarning=streak===0?'UWAGA: streak przerwany (0 dni)!':streak<3?`Słaby streak (${streak} dni) — zagrożony`:streak>7?`Dobry streak ${streak} dni!`:'';
@@ -3058,7 +3072,8 @@ function _aiCtx(){
   return {
     userProfile,
     ctx:`[DANE DYNAMICZNE]
-Dziś: ${dn[dow]} | Trening: ${tr}
+Dziś: ${dn[dow]}
+TRENING DZIŚ: ${tr} | ${trDetail}
 Level: ${lvl.label} (${xp} XP) | Streak: ${streak} dni ${streakWarning}
 Nawyki dziś: ${h.length}/${HABITS.length} | Wczoraj: ${habYesterday.length}/${HABITS.length}
 Questy ukończone: ${doneQ.length} total | Aktywne: ${allQ.length}
@@ -3066,7 +3081,7 @@ Questy MinHule do zrobienia: ${mhQ||'wszystkie ukończone!'}
 
 [NASTĘPNE QUESTY]
 ${allQ.slice(0,5).map((q,i)=>`${i+1}. ${q.title} (+${q.xp}XP, ${q.proj})`).join('\n')}`,
-    allQ, mhQ, streak, xp, h, dn, dow, tr
+    allQ, mhQ, streak, xp, h, dn, dow, tr, trDetail
   };
 }
 
