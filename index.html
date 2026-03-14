@@ -2840,15 +2840,18 @@ async function qcGenerate(){
 
 Rozłóż ten cel na 3-5 konkretnych, wykonalnych questów. Każdy quest to jedno działanie które Ignacy może zrobić.
 
-Odpowiedz TYLKO JSON (bez markdown):
-{"quests":[
-  {"title":"Tytuł questa max 60 znaków","why":"Dlaczego to ważne – 1 zdanie","proj":"minhule","diff":"easy","time":"30 min","xp":30,"section":"Nazwa sekcji"},
-  ...
-],"summary":"1 zdanie podsumowujące jak te questy prowadzą do celu"}`;
+Odpowiedz TYLKO czystym JSON, zero tekstu przed ani po, zero markdown:
+{"quests":[{"title":"max 60 znaków","why":"1 zdanie","proj":"minhule","diff":"easy","time":"30 min","xp":30,"section":"Nazwa"},{"title":"...","why":"...","proj":"...","diff":"medium","time":"...","xp":40,"section":"..."}],"summary":"1 zdanie"}`;
 
-    const raw=await callAI(prompt,400);
+    const raw=await callAI(prompt,600);
     let data;
-    try{data=JSON.parse(raw.replace(/```\w*|```/g,'').trim());}catch(e){data=null;}
+    try{
+      let cleaned=raw.replace(/```\w*|```/g,'').trim();
+      const first=cleaned.indexOf('{');
+      const last=cleaned.lastIndexOf('}');
+      if(first!==-1&&last!==-1)cleaned=cleaned.slice(first,last+1);
+      data=JSON.parse(cleaned);
+    }catch(e){data=null;}
 
     if(data&&data.quests&&data.quests.length>0){
       // Render preview
@@ -2882,7 +2885,7 @@ Odpowiedz TYLKO JSON (bez markdown):
           <button onclick="document.getElementById('qc-preview').style.display='none';document.getElementById('qc-goal-input').value=''" style="padding:12px 14px;background:transparent;border:1px solid rgba(255,255,255,.08);border-radius:10px;font-family:Barlow Condensed,sans-serif;font-size:11px;font-weight:700;color:var(--text-d);cursor:pointer">✕ Anuluj</button>
         </div>`;
     } else {
-      if(preview){preview.style.display='block';preview.innerHTML='<div style="color:var(--red);font-size:12px;padding:10px">Błąd parsowania. Spróbuj inaczej opisać cel.</div>';}
+      if(preview){preview.style.display='block';preview.innerHTML=`<div style="color:var(--red);font-size:12px;padding:10px;line-height:1.6">❌ Błąd parsowania odpowiedzi AI.<br><span style="color:var(--text-d);font-size:10px">Spróbuj ponownie — Groq czasem zwraca niepoprawny JSON.</span></div>`;}
     }
   }catch(e){
     if(preview){preview.style.display='block';preview.innerHTML=`<div style="color:var(--red);font-size:12px;padding:10px">Błąd: ${e.message}</div>`;}
