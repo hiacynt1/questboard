@@ -949,6 +949,37 @@ async function sbLoad(){
   if(data.ai_profile){
     try{localStorage.setItem('iqb_ai_profile',data.ai_profile);}catch(e){}
   }
+  // Ads Guide (checklist + kroki)
+  if(data.mh_ads_guide){
+    try{localStorage.setItem('mh_ads_guide',data.mh_ads_guide);}catch(e){}
+  }
+  // Command Center (analityka MinHule)
+  if(data.mh_command_center){
+    try{localStorage.setItem('mh_command_center',data.mh_command_center);}catch(e){}
+  }
+  // Treningi siłowni
+  if(data.sil_done){
+    try{
+      const sil=JSON.parse(data.sil_done);
+      Object.entries(sil).forEach(([k,v])=>localStorage.setItem(k,v));
+    }catch(e){}
+  }
+  // Motyw kolorystyczny
+  if(data.theme_idx!==null&&data.theme_idx!==undefined){
+    try{localStorage.setItem('iqb_theme_idx',String(data.theme_idx));}catch(e){}
+  }
+  // PIN hash
+  if(data.pin_hash){
+    try{localStorage.setItem('iqb_pin_hash',data.pin_hash);}catch(e){}
+  }
+  // Push settings
+  if(data.push_settings){
+    try{
+      const ps=JSON.parse(data.push_settings);
+      if(ps.enabled)localStorage.setItem('iqb_push',ps.enabled);
+      if(ps.last)localStorage.setItem('iqb_push_last',ps.last);
+    }catch(e){}
+  }
 }
 
 function mergeHabits(a,b){
@@ -968,10 +999,17 @@ async function sbPush(){
   if(!_sb)return;
   try{
     sbSetStatus('↑');
+    // Zbierz d3 (zadania dnia)
     const d3obj={};
     for(let i=0;i<localStorage.length;i++){
       const k=localStorage.key(i);
       if(k&&k.startsWith('d3_'))d3obj[k]=localStorage.getItem(k);
+    }
+    // Zbierz treningi siłowni (sil_done_*)
+    const silobj={};
+    for(let i=0;i<localStorage.length;i++){
+      const k=localStorage.key(i);
+      if(k&&k.startsWith('sil_done_'))silobj[k]=localStorage.getItem(k);
     }
     await _sb.from('iqb_data').upsert({
       user_id: SB_USER,
@@ -980,6 +1018,15 @@ async function sbPush(){
       notes: localStorage.getItem('iqb_notes')||'[]',
       custom_quests: JSON.stringify(QUESTS.filter(q=>q.custom)||[]),
       ai_profile: localStorage.getItem('iqb_ai_profile')||'',
+      mh_ads_guide: localStorage.getItem('mh_ads_guide')||'{}',
+      mh_command_center: localStorage.getItem('mh_command_center')||'{"entries":[]}',
+      sil_done: JSON.stringify(silobj),
+      theme_idx: localStorage.getItem('iqb_theme_idx')||'0',
+      pin_hash: localStorage.getItem('iqb_pin_hash')||'',
+      push_settings: JSON.stringify({
+        enabled: localStorage.getItem('iqb_push')||'',
+        last: localStorage.getItem('iqb_push_last')||''
+      }),
       updated_at: new Date().toISOString()
     },{onConflict:'user_id'});
     sbSetStatus('✓');
@@ -1870,9 +1917,16 @@ function cycleTheme(){
   localStorage.setItem('iqb_theme_idx',idx);
   applyTheme(THEMES[idx]);
   notify('🎨 '+THEMES[idx].name,'Nowy motyw');
+  sbPushDebounced();
 }
 
 let _pin='';
+// Debounced sync — nie wysyła za każdym keystroke, czeka 2s po ostatniej zmianie
+let _sbPushTimer=null;
+function sbPushDebounced(){
+  clearTimeout(_sbPushTimer);
+  _sbPushTimer=setTimeout(()=>sbPush().catch(e=>console.warn('sync:',e)),2000);
+}
 function pinTap(x){
   if(x==='del'){_pin=_pin.slice(0,-1)}
   else if(x==='ok'){pinCheck().catch(()=>{})}
@@ -3132,7 +3186,7 @@ function saveAIProfile(v){
   if(ch)ch.textContent=v.length.toLocaleString()+' znaków';
   setTimeout(()=>{if(st)st.textContent='';},2000);
   // Sync do chmury
-  sbSave();
+  sbPushDebounced();
 }
 
 function getAIProfile(){
@@ -5386,7 +5440,7 @@ function mhToggleStep(id){
 }
 
 function mhGetState(){try{return JSON.parse(localStorage.getItem('mh_ads_guide')||'{}')}catch(e){return{}}}
-function mhSaveState(s){localStorage.setItem('mh_ads_guide',JSON.stringify(s))}
+function mhSaveState(s){localStorage.setItem('mh_ads_guide',JSON.stringify(s));sbPushDebounced();}
 
 // ══════════════════════════════════════════════
 // NAV
@@ -5643,7 +5697,7 @@ function ccGetData(){
   catch(e){ return {entries:[]}; }
 }
 
-function ccSaveData(d){ localStorage.setItem(CC_KEY, JSON.stringify(d)); }
+function ccSaveData(d){ localStorage.setItem(CC_KEY, JSON.stringify(d)); sbPushDebounced(); }
 
 
 function updateMhHub(){
